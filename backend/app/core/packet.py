@@ -3,17 +3,16 @@ import zlib
 from dataclasses import dataclass
 from typing import ClassVar
 
+
 @dataclass
 class Packet:
     symbol_seed: int
     payload: bytes
 
-    # Class variables for struct formats to ensure consistency
-    # > = big-endian, I = uint32 (4 bytes), H = uint16 (2 bytes)
     HEADER_FORMAT: ClassVar[str] = ">IH"
-    HEADER_SIZE: ClassVar[int] = struct.calcsize(HEADER_FORMAT)
+    HEADER_SIZE: ClassVar[int] = struct.calcsize(">IH")
     CRC_FORMAT: ClassVar[str] = ">I"
-    CRC_SIZE: ClassVar[int] = struct.calcsize(CRC_FORMAT)
+    CRC_SIZE: ClassVar[int] = struct.calcsize(">I")
 
     def serialize(self) -> bytes:
         payload_length = len(self.payload)
@@ -27,31 +26,20 @@ class Packet:
         min_size = cls.HEADER_SIZE + cls.CRC_SIZE
         if len(data) < min_size:
             raise ValueError(f"Packet too short: {len(data)} bytes")
-        
-        # Split into main data and CRC
         main_data = data[:-cls.CRC_SIZE]
         crc_bytes = data[-cls.CRC_SIZE:]
-        
-        # Verify CRC
         expected_crc = struct.unpack(cls.CRC_FORMAT, crc_bytes)[0]
         actual_crc = zlib.crc32(main_data) & 0xFFFFFFFF
         if expected_crc != actual_crc:
             raise ValueError(f"CRC mismatch. Expected {expected_crc}, got {actual_crc}")
-            
-        # Unpack header
         header_bytes = main_data[:cls.HEADER_SIZE]
         symbol_seed, payload_length = struct.unpack(cls.HEADER_FORMAT, header_bytes)
-        
-        # Extract payload
         payload = main_data[cls.HEADER_SIZE:]
         if len(payload) != payload_length:
-            raise ValueError(f"Payload length mismatch. Header says {payload_length}, actual is {len(payload)}")
-            
+            raise ValueError(f"Payload length mismatch.")
         return cls(symbol_seed=symbol_seed, payload=payload)
 
     def __eq__(self, other):
         if not isinstance(other, Packet):
             return NotImplemented
-        return (self.symbol_seed == other.symbol_seed and 
-                self.payload == other.payload)
-
+        return self.symbol_seed == other.symbol_seed and self.payload == other.payload
