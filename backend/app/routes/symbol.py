@@ -9,6 +9,9 @@ it into the peeling decoder. Returns the current decode progress.
 The generation-counter double-check (snapshot before lock, verify after)
 is the guard against stale symbols from a previous transfer contaminating
 the new decoder after a re-upload.
+
+After a successful decode, the progress update is broadcast to all
+connected Receive-page WebSocket clients via receiver_socket.manager.
 """
 
 import base64
@@ -102,9 +105,20 @@ async def receive_symbol(body: SymbolRequest):
 
         state.decoder.add_symbol(body.seed, payload_bytes)
 
-        return SymbolResponse(
-            progress=state.decoder.progress,
-            k=state.k,
-            complete=state.decoder.is_complete,
-            dropped=False,
-        )
+        progress  = state.decoder.progress
+        k         = state.k
+        complete  = state.decoder.is_complete
+
+    # ── Broadcast to Receive-page WebSocket clients ─────────────────────────
+    # Imported here (not at module level) to avoid a circular import:
+    # main.py imports symbol.py before receiver_socket.py, so a top-level
+    # import of receiver_socket inside symbol.py would fail on startup.
+    from app.ws.receiver_socket import manager
+    await manager.broadcast(progress, k, complete)
+
+    return SymbolResponse(
+        progress=progress,
+        k=k,
+        complete=complete,
+        dropped=False,
+    )
