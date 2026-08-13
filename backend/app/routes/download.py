@@ -19,7 +19,7 @@ SHA-256 field discipline:
 import hashlib
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 
@@ -89,9 +89,9 @@ async def download_file(expected_sha256: Optional[str] = Query(default=None)):
         #     If upload_sha256 changed, a re-upload happened since the client
         #     last fetched metadata.
         if state.upload_sha256 != expected_sha256:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=409,
-                detail={
+                content={
                     "error": "stale_transfer",
                     "message": "The transfer you requested is no longer active. Re-fetch /api/metadata.",
                 },
@@ -99,9 +99,9 @@ async def download_file(expected_sha256: Optional[str] = Query(default=None)):
 
         # 3b. Completeness check
         if not state.decoder.is_complete:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=409,
-                detail={
+                content={
                     "error": "not_complete",
                     "message": "Transfer not complete yet.",
                 },
@@ -123,9 +123,9 @@ async def download_file(expected_sha256: Optional[str] = Query(default=None)):
             # without requiring a re-upload. Caller (us) holds the lock —
             # reset_decoder() must NOT acquire it internally.
             reset_decoder()
-            raise HTTPException(
+            return JSONResponse(
                 status_code=409,
-                detail={
+                content={
                     "error": "hash_mismatch",
                     "message": "Reconstruction failed integrity check. Keep receiving.",
                 },

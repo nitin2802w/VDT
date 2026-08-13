@@ -86,7 +86,7 @@ def test_upload_and_metadata(client) -> tuple[bytes, dict]:
 def test_download_before_complete(client, sha256: str):
     resp = client.get(f"{BASE}/api/download?expected_sha256={sha256}")
     assert resp.status_code == 409
-    assert resp.json()["detail"]["error"] == "not_complete"
+    assert resp.json()["error"] == "not_complete"
     print("  /download before complete -> 409 not_complete OK")
 
 
@@ -119,7 +119,7 @@ def test_stale_transfer(client, old_sha256: str):
 
     resp = client.get(f"{BASE}/api/download?expected_sha256={old_sha256}")
     assert resp.status_code == 409
-    assert resp.json()["detail"]["error"] == "stale_transfer"
+    assert resp.json()["error"] == "stale_transfer"
     print("  stale_transfer guard -> 409 stale_transfer OK")
 
 
